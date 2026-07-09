@@ -7,7 +7,7 @@
 
 ---
 
-# 🚀 Overview
+#  Overview
 
 Universal Business Data Extraction Suite is a desktop application developed to automate repetitive business data processing tasks.
 
@@ -17,7 +17,7 @@ Designed for real-world office environments, the software focuses on reducing ma
 
 ---
 
-# ✨ Features
+#  Features
 
 ## 📄 1. OCR Data Extraction
 
@@ -33,7 +33,7 @@ Extract structured information directly from scanned PDFs and images.
 
 ---
 
-## 🌐 2. Company Classification Assistant
+##  2. Company Classification Assistant
 
 Automatically classify companies using Google Search.
 
@@ -46,10 +46,10 @@ Automatically classify companies using Google Search.
 
 Example buttons:
 
-- 🍴 Cutlery
-- 📦 Packaging
-- ❌ None
-- ⏭ Skip
+-  Cutlery
+-  Packaging
+-  None
+-  Skip
 
 The application automatically saves the selected category into a new Excel spreadsheet.
 
@@ -57,7 +57,7 @@ This significantly reduces the time required to manually classify hundreds of co
 
 ---
 
-## 🔍 3. Intelligent Excel Filter
+##  3. Intelligent Excel Filter
 
 Quickly create filtered Excel files based on company categories.
 
@@ -83,7 +83,7 @@ This works with any keyword or business category present in the dataset.
 
 ---
 
-# 📸 Screenshots
+#  Screenshots
 
 ## Main Dashboard
 
@@ -118,7 +118,7 @@ This works with any keyword or business category present in the dataset.
 
 ---
 
-# 🛠 Technologies Used
+#  Technologies Used
 
 ## Programming Language
 
@@ -154,7 +154,7 @@ This works with any keyword or business category present in the dataset.
 
 ---
 
-# 📂 Project Structure
+#  Project Structure
 
 ```
 Universal-Data-Suite
@@ -190,7 +190,7 @@ Download Tesseract OCR and ensure it is installed before running the OCR feature
 
 ---
 
-# ▶ Running
+# Running
 
 ```bash
 python universal_tool.py
@@ -198,7 +198,7 @@ python universal_tool.py
 
 ---
 
-# 📦 Windows Application
+#  Windows Application
 
 A pre-built Windows executable is available under the **Releases** section.
 
@@ -212,7 +212,7 @@ No Python installation is required.
 
 ---
 
-# 💼 Real-World Use Cases
+#  Real-World Use Cases
 
 - Business directory digitization
 - Supplier database creation
@@ -239,19 +239,19 @@ No Python installation is required.
 
 ---
 
-# 🤝 Contributing
+#  Contributing
 
 Contributions, bug reports, and feature suggestions are welcome.
 
 ---
 
-# 📜 License
+#  License
 
 MIT License
 
 ---
 
-# 👨‍💻 Author
+#  Author
 
 **Ritwik Kapur**
 
@@ -259,4 +259,4 @@ Python Developer • Robotics Enthusiast
 
 ---
 
-⭐ If you found this project useful, consider starring the repository.
+ If you found this project useful, consider starring the repository.
