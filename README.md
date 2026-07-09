@@ -90,25 +90,34 @@ This works with any keyword or business category present in the dataset.
 
 ## Main Dashboard
 
-![Main Window](screenshots/main_window.png)
+![Main Window](image_2026-07-09_143103172.png)
 
 ---
 
 ## OCR Extraction
 
-![OCR](screenshots/ocr.png)
+![OCR]<img width="1536" height="908" alt="image" src="https://github.com/user-attachments/assets/346cee9e-f77d-4f7d-b8a3-4c7315b06fbe" />
+)
+<img width="1504" height="809" alt="image" src="https://github.com/user-attachments/assets/44200ea0-461d-4be0-977a-930f31f19bbc" />
+
 
 ---
 
 ## Company Classification Popup
 
-![Classification](screenshots/classification.png)
+![Classification]<img width="1533" height="553" alt="image" src="https://github.com/user-attachments/assets/3bf52223-6c53-4050-9b56-9fab46859cac" />
+
+<img width="1453" height="702" alt="image" src="https://github.com/user-attachments/assets/cf88d29a-7266-4fe0-b915-8f67b4a03350" />
+<img width="1109" height="540" alt="image" src="https://github.com/user-attachments/assets/2aa21fce-4d43-474d-9f90-2d0dfddb6f59" />
 
 ---
 
 ## Filter Results
 
-![Filtering](screenshots/filter.png)
+![Filtering]<img width="726" height="756" alt="image" src="https://github.com/user-attachments/assets/6526caa5-6654-495a-89fa-3f54f605b8a2" />
+<img width="312" height="147" alt="image" src="https://github.com/user-attachments/assets/6cc7607e-526b-44b4-a3d9-4377dec9ef03" />
+
+<img width="1523" height="832" alt="image" src="https://github.com/user-attachments/assets/bbaaa755-79bd-4d75-a83d-f2c6335271ed" />
 
 ---
 
