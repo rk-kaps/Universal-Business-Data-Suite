@@ -1,8 +1,5 @@
 # 📊 Universal Business Data Extraction & Classification Suite
 
-<p align="center">
-  <img src="screenshots/banner.png" alt="Universal Business Data Extraction Suite" width="900">
-</p>
 
 <p align="center">
   <b>An all-in-one desktop application that automates business directory processing, company classification, and intelligent Excel filtering.</b>
