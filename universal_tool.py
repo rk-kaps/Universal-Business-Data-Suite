@@ -1,44 +1,32 @@
 import sys
-
-print(sys.executable)
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import fitz  # PyMuPDF
 from PIL import Image
 import pytesseract
+from pytesseract import Output
 import pandas as pd
 import io
 import re
 import os
-import sys
 import webbrowser
 import urllib.parse
 import threading
 
 
-
 def get_tesseract_path():
-    # Running as a PyInstaller executable
-    if getattr(sys, "frozen", False):
-        base_path = os.path.dirname(sys.executable)
-        return os.path.join(base_path, "_internal", "Tesseract-OCR", "tesseract.exe")
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, 'Tesseract-OCR', 'tesseract.exe')
+    else:
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Tesseract-OCR', 'tesseract.exe')
 
-    # Running from source code
-    return os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "Tesseract-OCR",
-        "tesseract.exe"
-    )
-
-pytesseract.pytesseract.tesseract_cmd = get_tesseract_path()
 
 class UniversalExtractorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Universal Directory & Table Tool")
-        self.root.geometry("750x780")
+        self.root.title("Universal Directory Tool (Extractor, Classifier & Filter)")
+        self.root.geometry("750x650")
 
-        # Create Tabbed Interface
         self.notebook = ttk.Notebook(root)
         self.notebook.pack(expand=True, fill='both')
 
@@ -50,43 +38,37 @@ class UniversalExtractorApp:
         self.notebook.add(self.tab_classify, text="2. Classify Data")
         self.notebook.add(self.tab_filter, text="3. Filter & Export")
 
-        # Shared Filter Variables
         self.filter_in_var = tk.StringVar()
         self.filter_col_var = tk.StringVar()
         self.filter_kw_var = tk.StringVar(value="Solar, Energy, Panel")
 
-        # Classifier State
         self.df = None
         self.current_index = 0
         self.output_file = ""
-
-        # Simplified Custom Columns Variable
-        self.custom_cols_var = tk.StringVar(value="Name of the Company, CIN, Equity ISIN, Name of the Group, Sector")
 
         self.setup_extract_tab()
         self.setup_classify_tab()
         self.setup_filter_tab()
 
     # ==========================================
-    #             1. SIMPLIFIED EXTRACTION TAB
+    #             1. EXTRACTION TAB
     # ==========================================
     def setup_extract_tab(self):
-        # --- 1. File Settings ---
         file_frame = ttk.LabelFrame(self.tab_extract, text="1. File Settings", padding=10)
-        file_frame.pack(padx=10, pady=5, fill="x")
+        file_frame.pack(padx=10, pady=10, fill="x")
 
-        ttk.Label(file_frame, text="PDF File:").grid(row=0, column=0, sticky="w", pady=2)
+        ttk.Label(file_frame, text="PDF File:").grid(row=0, column=0, sticky="w", pady=5)
         self.pdf_path_var = tk.StringVar()
         ttk.Entry(file_frame, textvariable=self.pdf_path_var, width=50).grid(row=0, column=1, padx=5)
         ttk.Button(file_frame, text="Browse", command=self.browse_pdf).grid(row=0, column=2)
 
-        ttk.Label(file_frame, text="Save Excel As:").grid(row=1, column=0, sticky="w", pady=2)
-        self.extract_out_var = tk.StringVar(value="Extracted_PDF_Data.xlsx")
+        ttk.Label(file_frame, text="Save Excel As:").grid(row=1, column=0, sticky="w", pady=5)
+        self.extract_out_var = tk.StringVar(value="Extracted_Data.xlsx")
         ttk.Entry(file_frame, textvariable=self.extract_out_var, width=50).grid(row=1, column=1, padx=5)
         ttk.Button(file_frame, text="Browse", command=self.browse_extract_out).grid(row=1, column=2)
 
         page_frame = ttk.Frame(file_frame)
-        page_frame.grid(row=2, column=1, sticky="w", pady=5)
+        page_frame.grid(row=2, column=1, sticky="w", pady=10)
         ttk.Label(page_frame, text="Start Page:").pack(side="left")
         self.start_page_var = tk.IntVar(value=1)
         ttk.Entry(page_frame, textvariable=self.start_page_var, width=5).pack(side="left", padx=5)
@@ -94,61 +76,22 @@ class UniversalExtractorApp:
         self.end_page_var = tk.IntVar(value=10)
         ttk.Entry(page_frame, textvariable=self.end_page_var, width=5).pack(side="left", padx=5)
 
-        # --- 2. Smart Settings ---
-        settings_frame = ttk.LabelFrame(self.tab_extract, text="2. Smart Extraction Settings", padding=10)
-        settings_frame.pack(padx=10, pady=5, fill="x")
-
-        # Document Format Dropdown
-        ttk.Label(settings_frame, text="PDF Layout Type:").grid(row=0, column=0, sticky="w", pady=5)
-        self.layout_mode_var = tk.StringVar(value="Structured Table / Grid")
-        layout_dropdown = ttk.Combobox(settings_frame, textvariable=self.layout_mode_var, state="readonly", width=35)
-        layout_dropdown['values'] = ("Structured Table / Grid", "Unstructured Directory (Blocks)")
-        layout_dropdown.grid(row=0, column=1, sticky="w", padx=5)
-        layout_dropdown.bind("<<ComboboxSelected>>", self.on_layout_mode_change)
-
-        # Fast Text vs. OCR Dropdown
-        ttk.Label(settings_frame, text="Extraction Method:").grid(row=1, column=0, sticky="w", pady=5)
-        self.method_var = tk.StringVar(value="Fast Digital (Selectable Text)")
-        method_dropdown = ttk.Combobox(settings_frame, textvariable=self.method_var, state="readonly", width=35)
-        method_dropdown['values'] = ("Fast Digital (Selectable Text)", "OCR Scan (Scanned PDF / Image)")
-        method_dropdown.grid(row=1, column=1, sticky="w", padx=5)
-        method_dropdown.bind("<<ComboboxSelected>>", self.toggle_tesseract_warning)
-
-        # Collapsible Advanced Custom Columns Checkbox
-        self.show_adv_var = tk.BooleanVar(value=False)
-        self.adv_chk = ttk.Checkbutton(settings_frame, text="Specify Columns to Extract (Advanced)",
-                                       variable=self.show_adv_var, command=self.toggle_advanced_frame)
-        self.adv_chk.grid(row=2, column=1, sticky="w", pady=5)
-
-        # Hidden Tesseract path
         self.tesseract_path_var = tk.StringVar(value=get_tesseract_path())
 
-        # Tesseract Warning Message Label
-        self.tesseract_warn_label = ttk.Label(settings_frame, text="", foreground="orange", font=("Arial", 9, "italic"))
-        self.tesseract_warn_label.grid(row=3, column=1, sticky="w")
+        auto_frame = ttk.LabelFrame(self.tab_extract, text="2. Smart Auto-Detect Engine", padding=10)
+        auto_frame.pack(padx=10, pady=5, fill="x")
+        ttk.Label(auto_frame,
+                  text="The Universal Engine will automatically analyze each page and detect:\n• Grid Tables (e.g., Financial Sheets)\n• Borderless Tables (e.g., Tabular Exhibitor Lists)\n• Profile Blocks (e.g., Vertical paragraphs with emails/phones)",
+                  justify="left").pack(anchor="w")
 
-        # --- 3. Advanced Columns Frame (Hidden by Default) ---
-        self.adv_frame = ttk.LabelFrame(self.tab_extract, text="Advanced Column Customization", padding=10)
-
-        ttk.Label(self.adv_frame, text="Columns to Keep / Rename (Comma Separated):", font=("Arial", 9, "bold")).pack(
-            anchor="w", pady=2)
-        ttk.Entry(self.adv_frame, textvariable=self.custom_cols_var, width=75).pack(fill="x", pady=2)
-
-        help_text = (
-            "• Table Mode: Only columns matching these header names will be extracted from the PDF.\n"
-            "• Directory Mode: Renames the standard fields (Company, Address, Contact, Description) to these names."
-        )
-        ttk.Label(self.adv_frame, text=help_text, justify="left", foreground="gray", font=("Arial", 9, "italic")).pack(
-            anchor="w", pady=5)
-
-        # --- 4. Execution Control ---
         run_frame = ttk.Frame(self.tab_extract)
-        run_frame.pack(pady=15)
+        run_frame.pack(pady=20)
 
         self.extract_status_var = tk.StringVar(value="Ready.")
         ttk.Label(run_frame, textvariable=self.extract_status_var, font=("Arial", 10, "bold")).pack(pady=5)
 
-        self.btn_extract = ttk.Button(run_frame, text="Run Extractor", command=self.start_extraction_thread)
+        self.btn_extract = ttk.Button(run_frame, text="START UNIVERSAL EXTRACTION",
+                                      command=self.start_extraction_thread)
         self.btn_extract.pack(pady=5)
 
     def browse_pdf(self):
@@ -161,297 +104,321 @@ class UniversalExtractorApp:
         if path:
             self.extract_out_var.set(path)
 
-    def on_layout_mode_change(self, event=None):
-        mode = self.layout_mode_var.get()
-        if "Structured Table" in mode:
-            self.custom_cols_var.set("Name of the Company, CIN, Equity ISIN, Name of the Group, Sector")
-        else:
-            self.custom_cols_var.set("Company Name, Location/Address, Phone Extracted, Description/Products")
+    def get_words_from_page(self, page):
+        """
+        Extracts words with coordinates. Uses digital text if available,
+        otherwise falls back to OCR.
+        """
+        words = page.get_text("words")
+        if len(words) >= 10:
+            return [(w[0], w[1], w[2], w[3], w[4]) for w in words]
 
-    def toggle_advanced_frame(self):
-        if self.show_adv_var.get():
-            self.adv_frame.pack(padx=10, pady=5, fill="x")
-        else:
-            self.adv_frame.pack_forget()
+        # OCR Fallback
+        tess_path = self.tesseract_path_var.get()
+        if not os.path.exists(tess_path):
+            raise FileNotFoundError(
+                f"Tesseract OCR engine not found at:\n{tess_path}\n\nPlease verify your installation.")
 
-    def toggle_tesseract_warning(self, event=None):
-        if "OCR Scan" in self.method_var.get():
-            self.tesseract_warn_label.config(text=f"* Requires local OCR engine setup.")
-        else:
-            self.tesseract_warn_label.config(text="")
+        pytesseract.pytesseract.tesseract_cmd = tess_path
 
-    def get_keywords(self, var):
-        return [k.strip().upper() for k in var.get().split(',') if k.strip()]
+        pix = page.get_pixmap(dpi=300)
+        img = Image.open(io.BytesIO(pix.tobytes("png")))
 
-    def filter_table_by_columns(self, all_rows, desired_cols):
-        if not all_rows or not desired_cols:
-            return pd.DataFrame(all_rows)
+        ocr_data = pytesseract.image_to_data(img, output_type=Output.DICT)
+        df = pd.DataFrame(ocr_data)
+        df = df[(df.conf != '-1') & (df.text.str.strip() != '')]
 
-        # Clean rows of empty rows
-        cleaned_rows = [r for r in all_rows if r and any(x is not None and str(x).strip() != "" for x in r)]
-        if not cleaned_rows:
-            return pd.DataFrame(all_rows)
+        ocr_words = []
+        for _, row in df.iterrows():
+            x0 = float(row['left'])
+            y0 = float(row['top'])
+            x1 = x0 + float(row['width'])
+            y1 = y0 + float(row['height'])
+            text = str(row['text'])
+            ocr_words.append((x0, y0, x1, y1, text))
+        return ocr_words
 
-        header_row_idx = 0
-        matched_indices = {}
-        for d_col in desired_cols:
-            d_col_clean = d_col.strip().lower()
-            if not d_col_clean:
-                continue
-            best_idx = None
-            for idx, candidate in enumerate(cleaned_rows[header_row_idx]):
-                if candidate is None:
-                    continue
-                cand_clean = str(candidate).strip().lower()
-                if d_col_clean in cand_clean or cand_clean in d_col_clean:
-                    best_idx = idx
+    def group_words_by_lines(self, words_data):
+        """Groups words into horizontal lines based on visual vertical alignment."""
+        lines = {}
+        for w in words_data:
+            x0, y0, x1, y1, text = w
+            matched_y = None
+            for y in lines:
+                if abs(y0 - y) < 8:
+                    matched_y = y
                     break
-            if best_idx is not None:
-                matched_indices[d_col.strip()] = best_idx
+            if matched_y is None:
+                lines[y0] = []
+                matched_y = y0
+            lines[matched_y].append((x0, text, x1))
+        return [lines[y] for y in sorted(lines.keys())]
 
-        if not matched_indices:
-            # Fall back to returning all found columns if no headings match
-            return pd.DataFrame(cleaned_rows)
+    def get_layout_preserved_text(self, words_data, gap_threshold=15):
+        """Standardizes spacing using tabs by mapping coordinates to global horizontal columns."""
+        if not words_data: return ""
 
-        new_rows = []
-        headers = list(matched_indices.keys())
-        new_rows.append(headers)
+        # Dynamic Gap Scaling: Scale up thresholds if dealing with high-res OCR coordinates (pixels)
+        max_x = max(w[2] for w in words_data) if words_data else 0
+        current_gap_threshold = gap_threshold
+        if max_x > 1200:  # Typically means 300 DPI OCR coordinates
+            current_gap_threshold = gap_threshold * (300 / 72)
 
-        for row in cleaned_rows[header_row_idx + 1:]:
-            new_row = []
-            for col_name in headers:
-                idx = matched_indices[col_name]
-                if idx < len(row):
-                    new_row.append(row[idx])
+        # 1. Group words by visual vertical lines
+        lines = {}
+        for w in words_data:
+            x0, y0, x1, y1, text = w
+            matched_y = None
+            for y in lines:
+                if abs(y0 - y) < 8:
+                    matched_y = y
+                    break
+            if matched_y is None:
+                lines[y0] = []
+                matched_y = y0
+            lines[matched_y].append((x0, text, x1))
+
+        # 2. Extract column boundaries across the entire page
+        col_starts = []
+        for y in lines:
+            line_words = sorted(lines[y], key=lambda x: x[0])
+            if not line_words:
+                continue
+            col_starts.append(line_words[0][0])
+            prev_x1 = line_words[0][2]
+            for w in line_words[1:]:
+                x0, text, x1 = w
+                if (x0 - prev_x1) > current_gap_threshold:
+                    col_starts.append(x0)
+                prev_x1 = x1
+
+        if not col_starts:
+            return ""
+
+        # Cluster the column starts to find distinct table columns (with a standard coordinate tolerance)
+        col_starts = sorted(col_starts)
+        clusters = []
+        for x in col_starts:
+            if not clusters:
+                clusters.append([x])
+            else:
+                avg_last = sum(clusters[-1]) / len(clusters[-1])
+                tolerance = 20
+                if max_x > 1200:
+                    tolerance = 20 * (300 / 72)
+                if x - avg_last < tolerance:
+                    clusters[-1].append(x)
                 else:
-                    new_row.append("")
-            new_rows.append(new_row)
+                    clusters.append([x])
 
-        df = pd.DataFrame(new_rows[1:], columns=new_rows[0])
-        return df
+        column_coordinates = [min(cluster) for cluster in clusters]
+
+        # Helper to find which column index a word belongs to based on coordinates
+        def get_column_index(x0):
+            best_idx = 0
+            for idx, col_x in enumerate(column_coordinates):
+                tol = 10
+                if max_x > 1200:
+                    tol = 10 * (300 / 72)
+                if x0 >= col_x - tol:
+                    best_idx = idx
+                else:
+                    break
+            return best_idx
+
+        # 3. Reconstruct lines of text mapped strictly to the detected columns
+        sorted_y = sorted(lines.keys())
+        final_text = []
+        for y in sorted_y:
+            line_words = sorted(lines[y], key=lambda x: x[0])
+            column_words = {i: [] for i in range(len(column_coordinates))}
+
+            for word_data in line_words:
+                x0, text, x1 = word_data
+                col_idx = get_column_index(x0)
+                column_words[col_idx].append(text)
+
+            # Build a tab-delimited string preserving columns that were left empty on this line
+            line_parts = []
+            active_cols = [idx for idx, words in column_words.items() if words]
+            if active_cols:
+                max_col_idx = max(active_cols)
+                for idx in range(max_col_idx + 1):
+                    words = column_words[idx]
+                    if words:
+                        line_parts.append(" ".join(words))
+                    else:
+                        line_parts.append("")
+                line_str = "\t".join(line_parts)
+                final_text.append(line_str)
+            else:
+                final_text.append("")
+
+        return "\n".join(final_text)
+
+    def parse_borderless_table(self, text):
+        """Reconstructs borderless tables handling wrapped text correctly column-by-column."""
+        records = []
+        current_record = []
+
+        for line in text.split('\n'):
+            # Split by tabs but do NOT discard empty strings so we preserve exact columns
+            cols = [c.strip() for c in line.split('\t')]
+
+            # If line is completely empty, skip it
+            if not any(cols):
+                continue
+
+            # Check if the first column contains a new Serial Number
+            first_col = cols[0]
+            is_new_record = bool(re.match(r'^\d+$', first_col) or re.match(r'^\d+[\.\s]', first_col))
+
+            # Special case: Header line (which has no serial number but is the very first row)
+            if not current_record and len(cols) >= 3:
+                is_new_record = True
+
+            if is_new_record:
+                if current_record:
+                    records.append(current_record)
+                current_record = cols
+            else:
+                # Wrapped text (append to the existing record column-for-column)
+                if current_record:
+                    for i in range(len(cols)):
+                        val = cols[i]
+                        if not val:  # Skip empty wrapping elements
+                            continue
+                        if i < len(current_record):
+                            if current_record[i]:
+                                current_record[i] += " " + val
+                            else:
+                                current_record[i] = val
+                        else:
+                            current_record.append(val)
+
+        if current_record:
+            records.append(current_record)
+
+        dict_records = []
+        for r in records:
+            row_dict = {}
+            for i, col_val in enumerate(r):
+                row_dict[f"Column {i + 1}"] = col_val
+            dict_records.append(row_dict)
+        return dict_records
+
+    def parse_profile_mode(self, text):
+        records = []
+        blocks = re.split(r'\n\s*\n', text)
+        for block in blocks:
+            lines = [l.strip() for l in block.split('\n') if l.strip()]
+            if len(lines) < 2: continue
+
+            record = {"Company / Title": lines[0], "Email": "", "Phone": "", "Website": "", "Details": ""}
+            details = []
+            for line in lines[1:]:
+                email = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', line)
+                if email and not record["Email"]:
+                    record["Email"] = email.group(0)
+                    line = line.replace(email.group(0), "").strip()
+
+                web = re.search(r'(www\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|http[s]?://[^\s]+)', line)
+                if web and not record["Website"]:
+                    record["Website"] = web.group(0)
+                    line = line.replace(web.group(0), "").strip()
+
+                phone = re.search(r'(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{4}', line)
+                if phone and not record["Phone"]:
+                    record["Phone"] = phone.group(0)
+                    line = line.replace(phone.group(0), "").strip()
+
+                if line: details.append(line)
+            record["Details"] = "\n".join(details)
+            records.append(record)
+        return records
 
     def start_extraction_thread(self):
         if not self.pdf_path_var.get():
             messagebox.showerror("Error", "Please select a PDF file.")
             return
 
-        if "OCR Scan" in self.method_var.get():
-            pytesseract.pytesseract.tesseract_cmd = self.tesseract_path_var.get()
-            if not os.path.exists(pytesseract.pytesseract.tesseract_cmd):
-                messagebox.showerror("Error",
-                                     f"Tesseract OCR missing. For scanned documents, place Tesseract-OCR folder next to the app, or use Fast Digital mode.")
-                return
-
         self.btn_extract.config(state="disabled")
-        self.extract_status_var.set("Initializing automated engine...")
+        self.extract_status_var.set("Initializing Universal Extraction...")
         threading.Thread(target=self.run_extraction, daemon=True).start()
 
     def run_extraction(self):
         try:
-            pdf_path = self.pdf_path_var.get()
-            out_path = self.extract_out_var.get()
-            start_page = self.start_page_var.get()
-            end_page = self.end_page_var.get()
-            layout_mode = self.layout_mode_var.get()
-            is_ocr = "OCR Scan" in self.method_var.get()
+            doc = fitz.open(self.pdf_path_var.get())
+            all_records = []
 
-            doc = fitz.open(pdf_path)
-            total_pages = doc.page_count
-            start_page = max(1, start_page)
-            end_page = min(total_pages, end_page)
+            for page_num in range(self.start_page_var.get() - 1, self.end_page_var.get()):
+                self.extract_status_var.set(f"Auto-Analyzing Page {page_num + 1} of {self.end_page_var.get()}...")
+                page = doc.load_page(page_num)
 
-            # ====================================================
-            # CASE A: STRUCTURED TABLE / GRID EXTRACTION (Auto-Detect)
-            # ====================================================
-            if "Structured Table / Grid" in layout_mode:
-                self.extract_status_var.set("Scanning document layout for tables...")
-                all_table_rows = []
+                # STEP 1: Attempt native gridline extraction first
+                tables = page.find_tables()
+                grid_found = False
 
-                for page_num in range(start_page - 1, end_page):
-                    self.extract_status_var.set(f"Extracting page grid {page_num + 1} of {end_page}...")
-                    page = doc.load_page(page_num)
+                if tables and tables.tables:
+                    for table in tables.tables:
+                        extracted_data = table.extract()
+                        if len(extracted_data) > 1:
+                            grid_found = True
+                            for row in extracted_data:
+                                cleaned_row = [str(cell).replace('\n', ' ').strip() if cell else "" for cell in row]
+                                if any(cleaned_row):
+                                    row_dict = {}
+                                    for i, col_val in enumerate(cleaned_row):
+                                        row_dict[f"Column {i + 1}"] = col_val
+                                    all_records.append(row_dict)
 
-                    if is_ocr:
-                        pix = page.get_pixmap(dpi=300)
-                        img = Image.open(io.BytesIO(pix.tobytes("png")))
-                        raw_text = pytesseract.image_to_string(img)
-                        lines = [line.strip().split() for line in raw_text.split('\n') if line.strip()]
-                        all_table_rows.extend(lines)
-                    else:
-                        tables = page.find_tables()
-                        for table in tables:
-                            rows = table.extract()
-                            if rows:
-                                all_table_rows.extend(rows)
+                # STEP 2: Heuristic Text Analyzer (Digital or OCR)
+                if not grid_found:
+                    words_data = self.get_words_from_page(page)
 
-                if not all_table_rows:
-                    self.extract_status_var.set("No grid lines found. Attempting digital word layout fallback...")
-                    for page_num in range(start_page - 1, end_page):
-                        page = doc.load_page(page_num)
-                        blocks = page.get_text("blocks")
-                        blocks.sort(key=lambda b: (b[1], b[0]))
-                        for b in blocks:
-                            clean_text = b[4].strip()
-                            if clean_text:
-                                all_table_rows.append([clean_text])
+                    if words_data:
+                        page_text = self.get_layout_preserved_text(words_data)
+                        lines = [l for l in page_text.split('\n') if l.strip()]
 
-                # Check if custom columns list is enabled
-                if self.show_adv_var.get() and self.custom_cols_var.get().strip():
-                    desired_cols = [c.strip() for c in self.custom_cols_var.get().split(",") if c.strip()]
-                    df = self.filter_table_by_columns(all_table_rows, desired_cols)
-                else:
-                    df = pd.DataFrame(all_table_rows)
-                    df.dropna(how='all', inplace=True)
+                        if lines:
+                            tab_count = sum(l.count('\t') for l in lines)
+                            tab_density = tab_count / len(lines)
 
-                df.to_excel(out_path, index=False, header=not df.columns.astype(str).str.isdigit().all())
-                self.extract_status_var.set(f"Success! Extracted {len(df)} lines.")
-                messagebox.showinfo("Success", f"Extraction complete! Saved to {os.path.basename(out_path)}")
-
-            # ====================================================
-            # CASE B: UNSTRUCTURED DIRECTORY EXTRACTION (Blocks)
-            # ====================================================
-            else:
-                # Built-in robust directory block keyword match parameters
-                start_kws = ["HALL", "BOOTH", "EXHIBITOR", "COMPANY", "STAND", "SR.NO", "SR. NO."]
-                addr_kws = ["STALL", "STAND", "ADDRESS", "ROAD", "STREET", "PLOT", "LOCATION", "CITY", "STATE", "ZIP"]
-                contact_kws = ["TEL", "MOBILE", "E-MAIL", "EMAIL", "WEBSITE", "WWW", "CONTACT PERSON", "CONTACT"]
-                prod_kws = ["PRODUCTS ON DISPLAY", "PRODUCTS", "DESCRIPTION", "PROFILE", "SERVICES", "SECTOR"]
-
-                companies = []
-                current_company = {}
-                company_name_buffer, address_buffer, products_buffer = [], [], []
-                phone = ""
-                capture_state = "SEARCHING_COMPANY"
-
-                for page_num in range(start_page - 1, end_page):
-                    self.extract_status_var.set(f"Parsing block page {page_num + 1} of {end_page}...")
-                    page = doc.load_page(page_num)
-
-                    if is_ocr:
-                        pix = page.get_pixmap(dpi=300)
-                        img = Image.open(io.BytesIO(pix.tobytes("png")))
-                        raw_text = pytesseract.image_to_string(img)
-                    else:
-                        raw_text = page.get_text("text")
-
-                    lines = [line.strip() for line in raw_text.split('\n') if line.strip()]
-
-                    for line in lines:
-                        upper_line = line.upper()
-                        is_new_company = False
-
-                        has_start = any(k in upper_line for k in start_kws)
-                        has_addr = any(k in upper_line for k in addr_kws)
-                        has_contact = any(k in upper_line for k in contact_kws)
-                        has_prod = any(k in upper_line for k in prod_kws)
-
-                        if has_start and not has_addr:
-                            is_new_company = True
-                        elif (
-                                len(line) > 5 and line.isupper() and not has_prod and not has_contact and not has_addr and not has_start):
-                            if capture_state not in ["SEARCHING_COMPANY", "READING_COMPANY_NAME"]:
-                                is_new_company = True
-
-                        if is_new_company:
-                            if company_name_buffer:
-                                current_company["Company Name"] = " ".join(company_name_buffer)
-                                current_company["Location/Address"] = " ".join(address_buffer)
-                                current_company["Phone Extracted"] = phone
-                                current_company["Description/Products"] = " ".join(products_buffer)
-                                companies.append(current_company)
-
-                            current_company = {}
-                            matched_k = next((k for k in start_kws if k in upper_line), None)
-                            if matched_k:
-                                part = re.split(matched_k, line, flags=re.IGNORECASE)[0].strip()
-                                company_name_buffer = [part] if part else []
+                            # High tab density = Borderless Table (e.g. Aahar PDF)
+                            if tab_density >= 0.5:
+                                records = self.parse_borderless_table(page_text)
+                                all_records.extend(records)
+                            # Low tab density = Profile block
                             else:
-                                company_name_buffer = [line]
+                                lines_of_words = self.group_words_by_lines(words_data)
+                                plain_lines = []
+                                for line_words in lines_of_words:
+                                    sorted_line = sorted(line_words, key=lambda x: x[0])
+                                    plain_lines.append(" ".join([w[1] for w in sorted_line]))
+                                plain_text = "\n".join(plain_lines)
 
-                            address_buffer, products_buffer = [], []
-                            phone = ""
-                            capture_state = "READING_COMPANY_NAME"
-                            continue
+                                records = self.parse_profile_mode(plain_text)
+                                all_records.extend(records)
 
-                        # State Machine Parsing Heuristic
-                        if capture_state == "READING_COMPANY_NAME":
-                            if has_addr:
-                                matched_k = next((k for k in addr_kws if k in upper_line), None)
-                                if matched_k:
-                                    name_part = re.split(matched_k, line, flags=re.IGNORECASE)[0].strip()
-                                    name_part = re.sub(r'[^a-zA-Z0-9\s]', '', name_part).strip()
-                                    if len(name_part) > 1 and name_part.isupper():
-                                        company_name_buffer.append(name_part)
-                                capture_state = "READING_ADDRESS"
-                            elif line.isupper() and len(line) > 2 and not has_start:
-                                company_name_buffer.append(line.strip())
-                            else:
-                                capture_state = "READING_ADDRESS"
-                                address_buffer.append(line)
+            if not all_records:
+                self.extract_status_var.set("No records found.")
+                messagebox.showwarning("No Data", "The extraction completed, but 0 records were found on these pages.")
+                return
 
-                        elif capture_state == "READING_ADDRESS":
-                            if has_addr:
-                                continue
-                            elif has_contact:
-                                capture_state = "SEARCHING_PRODUCTS"
-                                nums = re.findall(r'\+?\d[\d\s\-]{7,}\d', line)
-                                if nums:
-                                    phone = nums[0].strip()
-                            else:
-                                address_buffer.append(line)
-
-                        elif capture_state == "SEARCHING_PRODUCTS":
-                            if has_contact:
-                                nums = re.findall(r'\+?\d[\d\s\-]{7,}\d', line)
-                                if nums and not phone:
-                                    phone = nums[0].strip()
-                            elif has_prod:
-                                parts = line.split(":", 1)
-                                if len(parts) > 1:
-                                    products_buffer.append(parts[1].strip())
-                                capture_state = "READING_PRODUCTS"
-
-                        elif capture_state == "READING_PRODUCTS":
-                            products_buffer.append(line)
-
-                # Save last company in iteration
-                if company_name_buffer:
-                    current_company["Company Name"] = " ".join(company_name_buffer)
-                    current_company["Location/Address"] = " ".join(address_buffer)
-                    current_company["Phone Extracted"] = phone
-                    current_company["Description/Products"] = " ".join(products_buffer)
-                    companies.append(current_company)
-
-                self.extract_status_var.set("Saving directory to Excel...")
-                df = pd.DataFrame(companies)
-
-                # Map to custom column names if customized
-                if self.show_adv_var.get() and self.custom_cols_var.get().strip():
-                    desired_cols = [c.strip() for c in self.custom_cols_var.get().split(",") if c.strip()]
-                    rename_dict = {}
-                    standard_cols = ["Company Name", "Location/Address", "Phone Extracted", "Description/Products"]
-                    for i, col in enumerate(standard_cols):
-                        if i < len(desired_cols):
-                            rename_dict[col] = desired_cols[i]
-                    df.rename(columns=rename_dict, inplace=True)
-                    # Keep only the requested columns
-                    keep_cols = [desired_cols[i] for i in range(min(len(standard_cols), len(desired_cols)))]
-                    if keep_cols:
-                        df = df[keep_cols]
-
-                df.to_excel(out_path, index=False)
-                self.extract_status_var.set(f"Success! Extracted {len(df)} companies.")
-                messagebox.showinfo("Success",
-                                    f"Extraction complete! Saved {len(df)} directory items to {os.path.basename(out_path)}")
+            self.extract_status_var.set("Saving to Excel...")
+            df = pd.DataFrame(all_records)
+            df.to_excel(self.extract_out_var.get(), index=False)
+            self.extract_status_var.set(f"Success! Saved {len(df)} records.")
+            messagebox.showinfo("Extraction Complete", f"Saved {len(df)} records to {self.extract_out_var.get()}")
 
         except Exception as e:
             self.extract_status_var.set("Error occurred.")
-            messagebox.showerror("System Error", str(e))
+            messagebox.showerror("Error", str(e))
         finally:
             self.btn_extract.config(state="normal")
 
     # ==========================================
-    #            2. CLASSIFICATION TAB
+    #            2. CLASSIFICATION TAB (UNCHANGED)
     # ==========================================
     def setup_classify_tab(self):
         file_frame = ttk.LabelFrame(self.tab_classify, text="1. Load Data", padding=10)
@@ -470,7 +437,6 @@ class UniversalExtractorApp:
             filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel Files", "*.xlsx")]))).grid(row=1,
                                                                                                                  column=2)
 
-        # Dynamic Category Setup
         cat_frame = ttk.LabelFrame(self.tab_classify, text="2. Setup Categories", padding=10)
         cat_frame.pack(padx=10, pady=5, fill="x")
 
@@ -481,7 +447,6 @@ class UniversalExtractorApp:
         ttk.Button(self.tab_classify, text="Load Data & Start Classifying", command=self.load_classifier_data).pack(
             pady=10)
 
-        # Classification Area
         self.work_frame = ttk.Frame(self.tab_classify)
 
         self.progress_label = ttk.Label(self.work_frame, text="", font=("Arial", 10))
@@ -597,33 +562,29 @@ class UniversalExtractorApp:
         self.load_company()
 
     # ==========================================
-    #            3. FILTER & EXPORT TAB
+    #            3. FILTER & EXPORT TAB (UNCHANGED)
     # ==========================================
     def setup_filter_tab(self):
         frame = ttk.LabelFrame(self.tab_filter, text="3. Filter & Export Settings", padding=15)
         frame.pack(padx=10, pady=10, fill="both", expand=True)
 
-        # File Selection Row
         f_row = ttk.Frame(frame)
         f_row.pack(fill="x", pady=5)
         ttk.Label(f_row, text="1. Source File:", width=15).pack(side="left")
         ttk.Entry(f_row, textvariable=self.filter_in_var).pack(side="left", fill="x", expand=True, padx=5)
         ttk.Button(f_row, text="Browse", command=self.load_columns_for_filter).pack(side="left")
 
-        # Column Criteria Selection Row
         crit_row = ttk.Frame(frame)
         crit_row.pack(fill="x", pady=5)
         ttk.Label(crit_row, text="2. Search Column:", width=15).pack(side="left")
         self.col_dropdown = ttk.Combobox(crit_row, textvariable=self.filter_col_var, state="readonly")
         self.col_dropdown.pack(side="left", fill="x", expand=True, padx=5)
 
-        # Keyword Configuration Row
         kw_row = ttk.Frame(frame)
         kw_row.pack(fill="x", pady=5)
         ttk.Label(kw_row, text="3. Keywords:", width=15).pack(side="left")
         ttk.Entry(kw_row, textvariable=self.filter_kw_var).pack(side="left", fill="x", expand=True, padx=5)
 
-        # Dynamic Columns Checklist with Scrollbars
         ttk.Label(frame, text="4. Columns to Export (Select below):").pack(anchor="w", pady=(10, 0))
         list_frame = ttk.Frame(frame)
         list_frame.pack(fill="both", expand=True, pady=5)
@@ -635,15 +596,13 @@ class UniversalExtractorApp:
         self.export_cols_list.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        # Selection Helpers
         btn_frame = ttk.Frame(frame)
         btn_frame.pack(fill="x", pady=5)
-        ttk.Button(btn_frame, text="Select All",
-                   command=lambda: self.export_cols_list.select_set(0, tk.END)).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="Clear",
-                   command=lambda: self.export_cols_list.selection_clear(0, tk.END)).pack(side="left")
+        ttk.Button(btn_frame, text="Select All", command=lambda: self.export_cols_list.select_set(0, tk.END)).pack(
+            side="left", padx=5)
+        ttk.Button(btn_frame, text="Clear", command=lambda: self.export_cols_list.selection_clear(0, tk.END)).pack(
+            side="left")
 
-        # Executing Button
         ttk.Button(frame, text="Run Filter & Save New Excel", command=self.run_filter_export).pack(fill="x", pady=10)
 
     def load_columns_for_filter(self):
@@ -687,7 +646,6 @@ class UniversalExtractorApp:
 
             export_cols = [self.export_cols_list.get(i) for i in selected_indices]
 
-            # Matching function handling NaN cells
             def has_keyword(val):
                 if pd.isna(val):
                     return False
