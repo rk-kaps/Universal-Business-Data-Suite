@@ -16,7 +16,15 @@ Instead of spending hours manually extracting company information, searching web
 Designed for real-world office environments, the software focuses on reducing manual work while maintaining a simple interface for non-technical users.
 
 ---
+# CHANGES 
 
+## Added
+- Automatic extraction of selectable text from PDFs.
+- Intelligent detection of digital vs. scanned PDFs.
+- Automatic fallback to OCR when no selectable text is found.
+- Improved processing speed and extraction accuracy for digital PDFs.
+
+---
 #  Features
 
 ## 📄 1. OCR Data Extraction
@@ -32,8 +40,24 @@ Extract structured information directly from scanned PDFs and images.
 - Export directly to Excel
 
 ---
+## 2. Selectable Text Extraction from PDFs
 
-##  2. Company Classification Assistant
+The application now detects and extracts embedded selectable text directly from PDF documents before using OCR.
+
+### Features
+- Automatically detects whether a PDF contains selectable text.
+- Extracts text directly from the PDF without OCR when possible.
+- Preserves text accuracy and formatting better than OCR.
+- Significantly faster processing for digitally generated PDFs.
+- Falls back to OCR automatically for scanned PDFs.
+
+### Benefits
+- Faster document processing.
+- Higher extraction accuracy.
+- Reduced OCR errors.
+- Supports both digital and scanned PDFs seamlessly.
+---
+##  3. Company Classification Assistant
 
 Automatically classify companies using Google Search.
 
@@ -57,7 +81,7 @@ This significantly reduces the time required to manually classify hundreds of co
 
 ---
 
-##  3. Intelligent Excel Filter
+##  4. Intelligent Excel Filter
 
 Quickly create filtered Excel files based on company categories.
 
