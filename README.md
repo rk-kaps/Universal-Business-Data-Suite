@@ -16,15 +16,59 @@ Instead of spending hours manually extracting company information, searching web
 Designed for real-world office environments, the software focuses on reducing manual work while maintaining a simple interface for non-technical users.
 
 ---
-# CHANGES 
+## What's New
 
-## Added
-- Automatic extraction of selectable text from PDFs.
-- Intelligent detection of digital vs. scanned PDFs.
-- Automatic fallback to OCR when no selectable text is found.
-- Improved processing speed and extraction accuracy for digital PDFs.
+### Hybrid PDF Extraction Engine
 
----
+The extraction pipeline has been upgraded to automatically choose the best extraction method for each page instead of relying solely on OCR.
+ Also size reduced from
+### Native Selectable Text Extraction
+
+The tool now detects whether a PDF contains machine-readable (selectable) text.
+
+- Uses **PyMuPDF** for direct text extraction when selectable text is available.
+- Automatically switches to **Tesseract OCR** for scanned or image-based pages.
+- Significantly faster on digital PDFs.
+- Higher extraction accuracy by avoiding unnecessary OCR.
+- Better preservation of tables, spacing, and formatting.
+
+### Automatic Page Classification
+
+Every page is analysed before extraction and classified into an appropriate layout type, including:
+
+- Grid tables
+- Borderless layouts
+- Directory/Profile cards
+- Mixed layouts
+
+The appropriate extraction strategy is then selected automatically.
+
+### Spatial Layout Reconstruction
+
+A new spatial geometry parser reconstructs fragmented page layouts by analysing the `(x, y)` positions of text blocks.
+
+This greatly improves extraction from exhibitor directories where company names, addresses, and Hall/Stall information are positioned separately on the page.
+
+### Automatic Fallback Extraction
+
+If a specialised extraction method fails to produce records, the application automatically falls back to a generic paragraph parser, preventing empty output files.
+
+### Normalised Excel Output
+
+Regardless of the original PDF layout, all extracted data is converted into a consistent tabular format before being exported to Excel.
+
+This ensures reliable filtering, searching, and downstream processing.
+
+### Improved Reliability
+
+The hybrid extraction framework provides:
+
+- Faster processing of machine-readable PDFs
+- Accurate OCR support for scanned documents
+- Better handling of complex directory layouts
+- Improved extraction consistency across different PDF formats
+- Reduced manual intervention when processing new document types
+
 #  Features
 
 ## 📄 1. OCR Data Extraction
